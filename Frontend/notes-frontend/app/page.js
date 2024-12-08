@@ -28,13 +28,14 @@ const Home = () => {
     content: "",
   });
   const [isAddNote, setIsAddNote] = useState(false);
+  const [isSortedAsc, setIsSortedAsc] = useState(true); // New state for sorting
   const isDarkMode = useDarkMode();
 
   useEffect(() => {
     const loadNotes = async () => {
       const data = await fetchNotes();
       const mappedNotes = data.map((note) => ({
-        id: note._id, 
+        id: note._id,
         title: note.title,
         content: note.content,
         createdAt: note.createdAt,
@@ -44,6 +45,20 @@ const Home = () => {
 
     loadNotes();
   }, []);
+
+  const handleSortByCreated = () => {
+    // Toggle sorting order
+    setIsSortedAsc((prev) => !prev);
+
+    // Sort notes based on `createdAt`
+    setNotes((prevNotes) =>
+      [...prevNotes].sort((a, b) =>
+        isSortedAsc
+          ? new Date(a.createdAt) - new Date(b.createdAt) // Ascending
+          : new Date(b.createdAt) - new Date(a.createdAt) // Descending
+      )
+    );
+  };
 
   const handleEditClick = (note) => {
     setIsAddNote(false);
@@ -79,16 +94,16 @@ const Home = () => {
   };
 
   const handleDelete = async (id) => {
-    console.log("Deleting note with ID:", id); 
+    console.log("Deleting note with ID:", id);
     if (!id) {
       console.error("Error: ID is undefined. Cannot delete note.");
       alert("Failed to delete note. No ID provided.");
       return;
     }
-  
+
     try {
       if (confirm("Are you sure you want to delete this note?")) {
-        await deleteNote(id); 
+        await deleteNote(id);
         setNotes((prevNotes) => prevNotes.filter((note) => note.id !== id));
       }
     } catch (error) {
@@ -107,15 +122,54 @@ const Home = () => {
         position: "relative",
       }}
     >
-      <h1
+      <div
         style={{
-          textAlign: "center",
-          fontSize: "2rem",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
           marginBottom: "1.5rem",
         }}
       >
-        Notes
-      </h1>
+        {/* Sort Button */}
+        <button
+          onClick={handleSortByCreated}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "0.5rem",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+          title={`Sort by Created (${isSortedAsc ? "Asc" : "Desc"})`}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            fill={isDarkMode ? "#ffffff" : "#000000"}
+            viewBox="0 0 24 24"
+            style={{
+              transform: isSortedAsc ? "rotate(0deg)" : "rotate(180deg)", // Flip for descending
+              transition: "transform 0.3s ease",
+            }}
+          >
+            <path d="M12 2L19 9H5L12 2ZM12 22L5 15H19L12 22Z" />
+          </svg>
+        </button>
+
+        {/* Title */}
+        <h1
+          style={{
+            fontSize: "2rem",
+            margin: 0,
+          }}
+        >
+          Notes
+        </h1>
+      </div>
+
       <ul
         style={{
           paddingBottom: "4rem",
@@ -215,7 +269,7 @@ const Home = () => {
             left: "0",
             width: "100%",
             height: "100%",
-            backgroundColor: "rgba(0, 0, 0, 0.5)", 
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
@@ -227,12 +281,12 @@ const Home = () => {
               backgroundColor: isDarkMode ? "#1e1e1e" : "#ffffff",
               color: isDarkMode ? "#ffffff" : "#000000",
               padding: "2rem",
-              borderRadius: "12px", 
+              borderRadius: "12px",
               width: "90%",
               maxWidth: "500px",
-              boxShadow: "0 4px 8px rgba(0,0,0,0.3)", 
-              transition: "transform 0.3s ease-in-out", 
-              transform: "scale(1)", 
+              boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
+              transition: "transform 0.3s ease-in-out",
+              transform: "scale(1)",
             }}
           >
             <h2
