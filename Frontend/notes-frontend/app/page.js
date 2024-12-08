@@ -28,7 +28,8 @@ const Home = () => {
     content: "",
   });
   const [isAddNote, setIsAddNote] = useState(false);
-  const [isSortedAsc, setIsSortedAsc] = useState(true); // New state for sorting
+  const [isSortedAsc, setIsSortedAsc] = useState(true); 
+  const [isSaving, setIsSaving] = useState(false);
   const isDarkMode = useDarkMode();
 
   useEffect(() => {
@@ -52,10 +53,11 @@ const Home = () => {
 
     // Sort notes based on `createdAt`
     setNotes((prevNotes) =>
-      [...prevNotes].sort((a, b) =>
-        isSortedAsc
-          ? new Date(a.createdAt) - new Date(b.createdAt) // Ascending
-          : new Date(b.createdAt) - new Date(a.createdAt) // Descending
+      [...prevNotes].sort(
+        (a, b) =>
+          isSortedAsc
+            ? new Date(a.createdAt) - new Date(b.createdAt) // Ascending
+            : new Date(b.createdAt) - new Date(a.createdAt) // Descending
       )
     );
   };
@@ -75,22 +77,33 @@ const Home = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setCurrentNote({ id: null, title: "", content: "" });
+    setIsSaving(false);
   };
 
   const handleSave = async () => {
-    if (isAddNote) {
-      const newNote = await createNote(currentNote);
-      setNotes((prevNotes) => [...prevNotes, newNote]);
-    } else {
-      await updateNote(currentNote.id, currentNote);
-      setNotes((prevNotes) =>
-        prevNotes.map((note) =>
-          note.id === currentNote.id ? currentNote : note
-        )
-      );
-    }
+    if (isSaving) return;
+    try {
+      setIsSaving(true);
 
-    handleCloseModal();
+      if (isAddNote) {
+        const newNote = await createNote(currentNote);
+        setNotes((prevNotes) => [...prevNotes, newNote]);
+      } else {
+        await updateNote(currentNote.id, currentNote);
+        setNotes((prevNotes) =>
+          prevNotes.map((note) =>
+            note.id === currentNote.id ? currentNote : note
+          )
+        );
+      }
+
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error("Failed to save the note:", error.message);
+      alert("Failed to save the note. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -302,7 +315,9 @@ const Home = () => {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleSave();
+                if (!isSaving) {
+                  handleSave(); // Prevent multiple clicks by checking `isSaving`
+                }
               }}
             >
               <div style={{ marginBottom: "1rem" }}>
@@ -395,17 +410,18 @@ const Home = () => {
                 </button>
                 <button
                   type="submit"
+                  disabled={isSaving} // Disable the button while saving
                   style={{
                     padding: "0.5rem 1rem",
-                    backgroundColor: "#0070f3",
+                    backgroundColor: isSaving ? "#cccccc" : "#0070f3", // Change color when disabled
                     color: "#ffffff",
                     border: "none",
                     borderRadius: "8px",
-                    cursor: "pointer",
+                    cursor: isSaving ? "not-allowed" : "pointer", // Change cursor when disabled
                     transition: "background-color 0.3s",
                   }}
                 >
-                  Save
+                  {isSaving ? "Saving..." : "Save"} {/* Show loading state */}
                 </button>
               </div>
             </form>

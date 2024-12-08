@@ -1,4 +1,4 @@
-import { Injectable , NotFoundException} from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Note, NoteDocument } from './note.schema';
@@ -10,6 +10,15 @@ export class NotesService {
   ) {}
 
   async create(createNoteDto: { title: string; content: string }): Promise<Note> {
+    // Validate title and content
+    if (!createNoteDto.title || createNoteDto.title.trim() === '') {
+      throw new BadRequestException('Title is required');
+    }
+    if (!createNoteDto.content || createNoteDto.content.trim() === '') {
+      throw new BadRequestException('Content is required');
+    }
+
+    // Create the note
     const createdNote = new this.noteModel(createNoteDto);
     return createdNote.save();
   }
@@ -30,6 +39,14 @@ export class NotesService {
     id: string,
     updateNoteDto: { title: string; content: string },
   ): Promise<Note> {
+    // Validate title and content
+    if (updateNoteDto.title && updateNoteDto.title.trim() === '') {
+      throw new BadRequestException('Title cannot be empty');
+    }
+    if (updateNoteDto.content && updateNoteDto.content.trim() === '') {
+      throw new BadRequestException('Content cannot be empty');
+    }
+
     const updatedNote = await this.noteModel
       .findByIdAndUpdate(id, updateNoteDto, { new: true, runValidators: true })
       .exec();
