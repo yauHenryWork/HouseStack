@@ -4,19 +4,29 @@ import React, { useEffect, useState } from "react";
 import { fetchNotes, createNote, updateNote, deleteNote } from "./api";
 
 const useDarkMode = () => {
-  const [isDarkMode, setIsDarkMode] = useState(
-    () => window.matchMedia("(prefers-color-scheme: dark)").matches
-  );
+  const [isDarkMode, setIsDarkMode] = useState(false); // Default to false (or some default)
 
   useEffect(() => {
-    const handleThemeChange = (event) => setIsDarkMode(event.matches);
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    mediaQuery.addEventListener("change", handleThemeChange);
+    // Check for `window` and initialize the dark mode state
+    const darkModeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
-    return () => mediaQuery.removeEventListener("change", handleThemeChange);
-  }, []);
+    const updateDarkMode = () => {
+      setIsDarkMode(darkModeQuery.matches);
+    };
 
-  return isDarkMode;
+    // Set initial state
+    updateDarkMode();
+
+    // Add event listener for changes
+    darkModeQuery.addEventListener("change", updateDarkMode);
+
+    // Cleanup event listener on unmount
+    return () => {
+      darkModeQuery.removeEventListener("change", updateDarkMode);
+    };
+  }, []); // Empty dependency array ensures this runs only on mount
+
+  return [isDarkMode, setIsDarkMode];
 };
 
 const Home = () => {
@@ -41,25 +51,32 @@ const Home = () => {
         content: note.content,
         createdAt: note.createdAt,
       }));
-      setNotes(mappedNotes);
+
+      const sortedNotes = mappedNotes.sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt) // Ascending
+      );
+  
+      setNotes(sortedNotes);
     };
 
     loadNotes();
   }, []);
 
   const handleSortByCreated = () => {
-    // Toggle sorting order
-    setIsSortedAsc((prev) => !prev);
-
-    // Sort notes based on `createdAt`
+    // Determine the sorting order based on the current state
+    const sortOrder = isSortedAsc ? "desc" : "asc";
+  
+    // Sort notes based on `sortOrder`
     setNotes((prevNotes) =>
-      [...prevNotes].sort(
-        (a, b) =>
-          isSortedAsc
-            ? new Date(a.createdAt) - new Date(b.createdAt) // Ascending
-            : new Date(b.createdAt) - new Date(a.createdAt) // Descending
+      [...prevNotes].sort((a, b) =>
+        sortOrder === "asc"
+          ? new Date(a.createdAt) - new Date(b.createdAt) // Ascending
+          : new Date(b.createdAt) - new Date(a.createdAt) // Descending
       )
     );
+  
+    // Toggle the sorting state after sorting
+    setIsSortedAsc((prev) => !prev);
   };
 
   const handleEditClick = (note) => {
