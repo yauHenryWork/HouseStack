@@ -4,27 +4,17 @@ import React, { useEffect, useState } from "react";
 import { fetchNotes, createNote, updateNote, deleteNote } from "./api";
 
 const useDarkMode = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false); // Default to false (or some default)
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
-    // Check for `window` and initialize the dark mode state
     const darkModeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateDarkMode = () => setIsDarkMode(darkModeQuery.matches);
 
-    const updateDarkMode = () => {
-      setIsDarkMode(darkModeQuery.matches);
-    };
-
-    // Set initial state
     updateDarkMode();
-
-    // Add event listener for changes
     darkModeQuery.addEventListener("change", updateDarkMode);
 
-    // Cleanup event listener on unmount
-    return () => {
-      darkModeQuery.removeEventListener("change", updateDarkMode);
-    };
-  }, []); // Empty dependency array ensures this runs only on mount
+    return () => darkModeQuery.removeEventListener("change", updateDarkMode);
+  }, []);
 
   return [isDarkMode, setIsDarkMode];
 };
@@ -32,30 +22,23 @@ const useDarkMode = () => {
 const Home = () => {
   const [notes, setNotes] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentNote, setCurrentNote] = useState({
-    id: null,
-    title: "",
-    content: "",
-  });
+  const [currentNote, setCurrentNote] = useState({ id: null, title: "", content: "" });
   const [isAddNote, setIsAddNote] = useState(false);
-  const [isSortedAsc, setIsSortedAsc] = useState(true); 
+  const [isSortedAsc, setIsSortedAsc] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const isDarkMode = useDarkMode();
+  const [isDarkMode] = useDarkMode();
 
   useEffect(() => {
     const loadNotes = async () => {
       const data = await fetchNotes();
-      const mappedNotes = data.map((note) => ({
-        id: note._id,
-        title: note.title,
-        content: note.content,
-        createdAt: note.createdAt,
-      }));
-
-      const sortedNotes = mappedNotes.sort(
-        (a, b) => new Date(a.createdAt) - new Date(b.createdAt) // Ascending
-      );
-  
+      const sortedNotes = data
+        .map(note => ({
+          id: note._id,
+          title: note.title,
+          content: note.content,
+          createdAt: note.createdAt,
+        }))
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); // Default to ascending
       setNotes(sortedNotes);
     };
 
@@ -63,54 +46,29 @@ const Home = () => {
   }, []);
 
   const handleSortByCreated = () => {
-    // Determine the sorting order based on the current state
-    const sortOrder = isSortedAsc ? "desc" : "asc";
-  
-    // Sort notes based on `sortOrder`
-    setNotes((prevNotes) =>
+    setNotes(prevNotes =>
       [...prevNotes].sort((a, b) =>
-        sortOrder === "asc"
-          ? new Date(a.createdAt) - new Date(b.createdAt) // Ascending
-          : new Date(b.createdAt) - new Date(a.createdAt) // Descending
+        isSortedAsc
+          ? new Date(b.createdAt) - new Date(a.createdAt) // Descending
+          : new Date(a.createdAt) - new Date(b.createdAt) // Ascending
       )
     );
-  
-    // Toggle the sorting state after sorting
-    setIsSortedAsc((prev) => !prev);
-  };
-
-  const handleEditClick = (note) => {
-    setIsAddNote(false);
-    setCurrentNote(note);
-    setIsModalOpen(true);
-  };
-
-  const handleAddNoteClick = () => {
-    setIsAddNote(true);
-    setCurrentNote({ id: null, title: "", content: "" });
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setCurrentNote({ id: null, title: "", content: "" });
-    setIsSaving(false);
+    setIsSortedAsc(!isSortedAsc);
   };
 
   const handleSave = async () => {
     if (isSaving) return;
+
     try {
       setIsSaving(true);
 
       if (isAddNote) {
         const newNote = await createNote(currentNote);
-        setNotes((prevNotes) => [...prevNotes, newNote]);
+        setNotes(prevNotes => [...prevNotes, newNote]);
       } else {
         await updateNote(currentNote.id, currentNote);
-        setNotes((prevNotes) =>
-          prevNotes.map((note) =>
-            note.id === currentNote.id ? currentNote : note
-          )
+        setNotes(prevNotes =>
+          prevNotes.map(note => (note.id === currentNote.id ? currentNote : note))
         );
       }
 
@@ -123,141 +81,78 @@ const Home = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    console.log("Deleting note with ID:", id);
-    if (!id) {
-      console.error("Error: ID is undefined. Cannot delete note.");
-      alert("Failed to delete note. No ID provided.");
-      return;
-    }
+  const handleDelete = async id => {
+    if (!id || !confirm("Are you sure you want to delete this note?")) return;
 
     try {
-      if (confirm("Are you sure you want to delete this note?")) {
-        await deleteNote(id);
-        setNotes((prevNotes) => prevNotes.filter((note) => note.id !== id));
-      }
+      await deleteNote(id);
+      setNotes(prevNotes => prevNotes.filter(note => note.id !== id));
     } catch (error) {
       console.error("Failed to delete the note:", error.message);
       alert("Failed to delete the note. Please try again.");
     }
   };
 
+  const openModal = (note = { id: null, title: "", content: "" }, isAdd = true) => {
+    setCurrentNote(note);
+    setIsAddNote(isAdd);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setCurrentNote({ id: null, title: "", content: "" });
+    setIsSaving(false);
+  };
+
   return (
     <div
-      style={{
-        padding: "1rem",
-        backgroundColor: isDarkMode ? "#121212" : "#f5f5f5",
-        color: isDarkMode ? "#ffffff" : "#000000",
-        minHeight: "100vh",
-        position: "relative",
-      }}
+      className={`min-h-screen p-4 ${
+        isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"
+      }`}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          marginBottom: "1.5rem",
-        }}
-      >
-        {/* Sort Button */}
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-center w-full">Notes</h1>
         <button
           onClick={handleSortByCreated}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            padding: "0.5rem",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-          title={`Sort by Created (${isSortedAsc ? "Asc" : "Desc"})`}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-300"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            fill={isDarkMode ? "#ffffff" : "#000000"}
-            viewBox="0 0 24 24"
-            style={{
-              transform: isSortedAsc ? "rotate(0deg)" : "rotate(180deg)", // Flip for descending
-              transition: "transform 0.3s ease",
-            }}
-          >
-            <path d="M12 2L19 9H5L12 2ZM12 22L5 15H19L12 22Z" />
-          </svg>
+          Sort by Created ({isSortedAsc ? "Asc" : "Desc"})
         </button>
-
-        {/* Title */}
-        <h1
-          style={{
-            fontSize: "2rem",
-            margin: 0,
-          }}
-        >
-          Notes
-        </h1>
       </div>
 
-      <ul
-        style={{
-          paddingBottom: "4rem",
-          listStyle: "none",
-          margin: 0,
-          padding: 0,
-        }}
-      >
-        {notes.map((note) => (
+      {/* Notes List */}
+      <ul className="space-y-4">
+        {notes.map(note => (
           <li
             key={note.id}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "1rem",
-              marginBottom: "1rem",
-              backgroundColor: isDarkMode ? "#1e1e1e" : "#ffffff",
-              color: isDarkMode ? "#ffffff" : "#000000",
-              border: `1px solid ${isDarkMode ? "#333333" : "#dddddd"}`,
-              borderRadius: "8px",
-              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-            }}
+            className={`p-6 rounded-lg shadow-md flex justify-between items-center transition duration-300 hover:shadow-lg ${
+              isDarkMode ? "bg-gray-800 text-gray-200" : "bg-white text-gray-800"
+            }`}
           >
-            <div>
-              <h3 style={{ margin: 0 }}>{note.title}</h3>
-              <p
-                style={{ margin: 0, color: isDarkMode ? "#aaaaaa" : "#555555" }}
-              >
-                {note.content}
+            <div className="flex-1 space-y-1">
+              <h3 className="text-xl font-bold">
+                <span className="text-blue-500">Title:</span> {note.title}
+              </h3>
+              <p className="text-base">
+                <span className="font-semibold text-gray-500">Content:</span> {note.content}
+              </p>
+              <p className="text-sm text-gray-400">
+                <span className="font-semibold">Created At:</span>{" "}
+                {new Date(note.createdAt).toLocaleString()}
               </p>
             </div>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
+            <div className="flex gap-2">
               <button
-                onClick={() => handleEditClick(note)}
-                style={{
-                  padding: "0.5rem 1rem",
-                  backgroundColor: isDarkMode ? "#0070f3" : "#0070f3",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  transition: "background-color 0.3s",
-                }}
+                onClick={() => openModal(note, false)}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md shadow-sm hover:bg-blue-600 transition duration-300"
               >
                 Edit
               </button>
               <button
                 onClick={() => handleDelete(note.id)}
-                style={{
-                  padding: "0.5rem 1rem",
-                  backgroundColor: isDarkMode ? "#ff4d4d" : "#ff4d4d",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  transition: "background-color 0.3s",
-                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-md shadow-sm hover:bg-red-600 transition duration-300"
               >
                 Delete
               </button>
@@ -266,179 +161,86 @@ const Home = () => {
         ))}
       </ul>
 
+      {/* Empty Spacer to Avoid Overlap with Floating Add Button */}
+      <div className="h-16"></div>
+
       {/* Floating Add Button */}
       <button
-        onClick={handleAddNoteClick}
-        style={{
-          position: "fixed",
-          bottom: "2rem",
-          right: "2rem",
-          width: "60px",
-          height: "60px",
-          backgroundColor: "#0070f3",
-          color: "#ffffff",
-          border: "none",
-          borderRadius: "50%",
-          boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
-          cursor: "pointer",
-          fontSize: "2rem",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
+        onClick={() => openModal()}
+        className="fixed bottom-4 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center text-3xl"
       >
         +
       </button>
 
       {/* Modal */}
       {isModalOpen && (
-        <div
-          style={{
-            position: "fixed",
-            top: "0",
-            left: "0",
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: "1000",
-          }}
-        >
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div
-            style={{
-              backgroundColor: isDarkMode ? "#1e1e1e" : "#ffffff",
-              color: isDarkMode ? "#ffffff" : "#000000",
-              padding: "2rem",
-              borderRadius: "12px",
-              width: "90%",
-              maxWidth: "500px",
-              boxShadow: "0 4px 8px rgba(0,0,0,0.3)",
-              transition: "transform 0.3s ease-in-out",
-              transform: "scale(1)",
-            }}
+            className={`p-6 rounded-lg shadow-lg w-full max-w-md ${
+              isDarkMode ? "bg-gray-800 text-gray-200" : "bg-white text-gray-800"
+            }`}
           >
-            <h2
-              style={{
-                fontSize: "1.5rem",
-                marginBottom: "1rem",
-                textAlign: "center",
-                color: isDarkMode ? "#ffffff" : "#000000",
-              }}
-            >
+            <h2 className="text-xl font-bold mb-4 text-center">
               {isAddNote ? "Add Note" : "Edit Note"}
             </h2>
             <form
-              onSubmit={(e) => {
+              onSubmit={e => {
                 e.preventDefault();
-                if (!isSaving) {
-                  handleSave(); // Prevent multiple clicks by checking `isSaving`
-                }
+                handleSave();
               }}
             >
-              <div style={{ marginBottom: "1rem" }}>
-                <label
-                  htmlFor="title"
-                  style={{
-                    display: "block",
-                    marginBottom: "0.5rem",
-                    fontWeight: "bold",
-                    color: isDarkMode ? "#aaaaaa" : "#333333",
-                  }}
-                >
-                  Title:
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold" htmlFor="title">
+                  Title
                 </label>
                 <input
-                  type="text"
                   id="title"
+                  type="text"
                   value={currentNote.title}
-                  onChange={(e) =>
-                    setCurrentNote((prev) => ({
-                      ...prev,
-                      title: e.target.value,
-                    }))
+                  onChange={e =>
+                    setCurrentNote(prev => ({ ...prev, title: e.target.value }))
                   }
+                  className={`w-full px-3 py-2 border rounded-md ${
+                    isDarkMode ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-800"
+                  }`}
                   required
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem",
-                    border: `1px solid ${isDarkMode ? "#333333" : "#dddddd"}`,
-                    borderRadius: "8px",
-                    backgroundColor: isDarkMode ? "#2b2b2b" : "#ffffff",
-                    color: isDarkMode ? "#ffffff" : "#000000",
-                  }}
                 />
               </div>
-              <div style={{ marginBottom: "1rem" }}>
-                <label
-                  htmlFor="content"
-                  style={{
-                    display: "block",
-                    marginBottom: "0.5rem",
-                    fontWeight: "bold",
-                    color: isDarkMode ? "#aaaaaa" : "#333333",
-                  }}
-                >
-                  Content:
+              <div className="mb-4">
+                <label className="block mb-2 font-semibold" htmlFor="content">
+                  Content
                 </label>
                 <textarea
                   id="content"
                   value={currentNote.content}
-                  onChange={(e) =>
-                    setCurrentNote((prev) => ({
-                      ...prev,
-                      content: e.target.value,
-                    }))
+                  onChange={e =>
+                    setCurrentNote(prev => ({ ...prev, content: e.target.value }))
                   }
+                  className={`w-full px-3 py-2 border rounded-md ${
+                    isDarkMode ? "bg-gray-700 text-white" : "bg-gray-100 text-gray-800"
+                  }`}
                   required
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem",
-                    border: `1px solid ${isDarkMode ? "#333333" : "#dddddd"}`,
-                    borderRadius: "8px",
-                    backgroundColor: isDarkMode ? "#2b2b2b" : "#ffffff",
-                    color: isDarkMode ? "#ffffff" : "#000000",
-                    minHeight: "100px",
-                  }}
+                  rows={4}
                 />
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "1rem",
-                }}
-              >
+              <div className="flex justify-end gap-4">
                 <button
                   type="button"
-                  onClick={handleCloseModal}
-                  style={{
-                    padding: "0.5rem 1rem",
-                    backgroundColor: isDarkMode ? "#333333" : "#dddddd",
-                    color: isDarkMode ? "#ffffff" : "#000000",
-                    border: "none",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    transition: "background-color 0.3s",
-                  }}
+                  onClick={closeModal}
+                  className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition duration-300"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving} // Disable the button while saving
-                  style={{
-                    padding: "0.5rem 1rem",
-                    backgroundColor: isSaving ? "#cccccc" : "#0070f3", // Change color when disabled
-                    color: "#ffffff",
-                    border: "none",
-                    borderRadius: "8px",
-                    cursor: isSaving ? "not-allowed" : "pointer", // Change cursor when disabled
-                    transition: "background-color 0.3s",
-                  }}
+                  disabled={isSaving}
+                  className={`px-4 py-2 rounded-md text-white ${
+                    isSaving
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 transition duration-300"
+                  }`}
                 >
-                  {isSaving ? "Saving..." : "Save"} {/* Show loading state */}
+                  {isSaving ? "Saving..." : "Save"}
                 </button>
               </div>
             </form>
